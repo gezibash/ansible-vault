@@ -140,7 +140,7 @@
     owner: "{{ vault_user }}"
     group: "{{ vault_group }}"
     mode: "0600"
-  when: vault_gkms_credentials_src_file | length | bool
+  when: vault_gkms | bool
 
 - name: Vault main configuration
   become: true
@@ -272,14 +272,14 @@
 
 - name: Compute TLS friendly vault_addr
   set_fact:
-    vault_addr: "{{ (vault_address == '0.0.0.0') | ternary('127.0.0.1', vault_address) }}"
+    vault_addr: "{{ (vault_address == '0.0.0.0') or vault_listener_localhost_enable | ternary('127.0.0.1', vault_address) }}"
 
 - name: Insert http(s) export in dotfile
   become: true
   lineinfile:
     path: "{{ vault_home }}/.bashrc"
     regexp: "^export VAULT_ADDR="
-    line: "export VAULT_ADDR='{{ vault_tls_disable | ternary('http', 'https') }}://{{ vault_addr }}:{{ vault_port }}'"
+    line: "export VAULT_ADDR='{{ 'http' if not vault_tls_disable or vault_listener_localhost_enable else 'https' }}://{{ vault_addr }}:{{ vault_port }}'"
     owner: "{{ vault_user }}"
     group: "{{ vault_group }}"
     create: true
@@ -305,7 +305,7 @@
 - name: Vault API reachable?
   # Attempt to help with long lines > 160 issues
   vars:
-    vault_addr_protocol: "{{ vault_tls_disable | ternary('http', 'https') }}"
+    vault_addr_protocol: "{{ 'http' if not vault_tls_disable or vault_listener_localhost_enable else 'https' }}"
   uri:
     validate_certs: "{{ validate_certs_during_api_reachable_check | bool }}"
     url: "{{ vault_addr_protocol }}://{{ vault_hostname | default(vault_addr, true) }}:{{ vault_port }}/v1/sys/health"
